@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>El Guamil — App de Pedidos</title>
+<meta name="theme-color" content="#241206">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:ital,wght@0,400;0,600;0,700;0,800;1,600&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>
+  @media print{
+    body *{ visibility:hidden; }
+    #printArea, #printArea *{ visibility:visible; }
+    #printArea{
+      position:absolute; top:0; left:0; width:280px;
+      font-family:'Courier Prime', monospace; font-size:12px; color:#000; white-space:pre-wrap;
+    }
+  }
+  #printArea{ display:none; }
+  @media print{ #printArea{ display:block; } }
+</style>
+</head>
+<body>
+
+<div id="app-root"></div>
+
+<!-- Botón flotante de orden actual -->
+<button class="ticket-fab" id="ticketFab">
+  🧾 Ver orden <span class="cart-count" id="ticketCount">0</span>
+</button>
+
+<!-- Overlay + Drawer del ticket -->
+<div class="overlay" id="overlay"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-header">
+    <div>
+      <h3>Orden actual</h3>
+      <span id="drawerSubtitle">EL GUAMIL</span>
+    </div>
+    <button class="drawer-close" id="drawerClose">✕</button>
+  </div>
+  <div class="drawer-body" id="drawerBody"></div>
+  <div class="drawer-footer">
+    <textarea class="notes-field" id="notesField" rows="2" placeholder="Nota general del pedido (ej. para llevar, mesa junto a la ventana...)"></textarea>
+    <div class="total-row"><span>Total</span><span id="drawerTotal">$0</span></div>
+    <button class="drawer-btn kitchen" id="btnKitchen">🍳 Enviar a cocina</button>
+    <button class="drawer-btn cashier" id="btnCashier">💳 Cobrar / imprimir cuenta</button>
+    <button class="drawer-btn close-table" id="btnCloseTable">✅ Cobrado — liberar mesa</button>
+    <button class="drawer-btn clear" id="btnClear">Vaciar orden</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Área invisible usada solo para impresión de respaldo (window.print) -->
+<div id="printArea"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
