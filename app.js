@@ -4,8 +4,8 @@
 
 /* ============ DATOS DEL MENÚ ============ */
 const CATEGORIES = [
-  {id:'tacos', label:'Tacos (5 pz)', icon:'🌮', group:'comida'},
-  {id:'individuales', label:'Individuales', icon:'🫓', group:'comida'},
+  {id:'tacos', label:'Tacos por Orden (5 pz)', icon:'🌮', group:'comida'},
+  {id:'individuales', label:'Tacos por Pieza', icon:'🫓', group:'comida'},
   {id:'papas', label:'Papas Rellenas', icon:'🥔', group:'comida'},
   {id:'especialidades', label:'Especialidades', icon:'🍽️', group:'comida'},
   {id:'gringas', label:'Pastor Blanco y Gringas', icon:'🧀', group:'comida'},
@@ -358,6 +358,15 @@ function renderSalon(root){
   const topbar = buildTopbar({ title:'El Guamil', sub:'Salón · '+NUM_TABLES+' mesas', showBack:false, showConfig:true });
   root.appendChild(topbar);
 
+  const hero = document.createElement('div');
+  hero.className = 'salon-hero';
+  hero.innerHTML = `
+    <div class="salon-hero-ring"><img src="icons/icon-192.png" alt="El Guamil"></div>
+    <h2>El Guamil</h2>
+    <p>Tacos &amp; Papas Rellenas — comandas del día</p>
+  `;
+  root.appendChild(hero);
+
   const c = document.createElement('div');
   c.className = 'container';
 
@@ -371,8 +380,8 @@ function renderSalon(root){
     const count = computeCartCount(order.cart);
     card.innerHTML = `
       <div class="status-dot"></div>
+      <div class="table-medallion"><span class="num">${i}</span></div>
       <div class="label">Mesa</div>
-      <div class="num">${i}</div>
       <div class="meta">${count>0 ? count+' productos' : 'Libre'}</div>
       ${total>0 ? `<div class="total">$${total}</div>` : ''}
     `;
@@ -433,7 +442,7 @@ function buildTopbar({title, sub, showBack, showConfig}){
   const bar = document.createElement('div');
   bar.className = 'topbar';
   bar.innerHTML = `
-    ${showBack ? '<button class="back-btn" id="backBtn">← Salón</button>' : ''}
+    ${showBack ? '<button class="back-btn" id="backBtn">← Salón</button>' : '<img class="logo-mini" src="icons/icon-192.png" alt="El Guamil">'}
     <div style="flex:1;">
       <h1 style="margin:0;">${title}</h1>
       ${sub ? `<div class="sub">${sub}</div>` : ''}
@@ -512,6 +521,10 @@ function renderOrderScreen(root, ctx){
   chipRow.className = 'chip-row';
   c.appendChild(chipRow);
 
+  const catHeading = document.createElement('div');
+  catHeading.className = 'cat-heading';
+  c.appendChild(catHeading);
+
   const itemGrid = document.createElement('div');
   itemGrid.className = 'item-grid';
   c.appendChild(itemGrid);
@@ -532,7 +545,13 @@ function renderOrderScreen(root, ctx){
 
   function renderItems(){
     itemGrid.innerHTML = '';
-    ITEMS[currentCat].forEach(item=> itemGrid.appendChild(buildItemCard(item, ctx)));
+    const cat = CATEGORIES.find(cat=>cat.id===currentCat);
+    catHeading.innerHTML = `<span class="cat-icon">${cat.icon}</span><h3>${cat.label}</h3><span class="cat-count">${ITEMS[currentCat].length} productos</span>`;
+    ITEMS[currentCat].forEach((item,idx)=>{
+      const card = buildItemCard(item, ctx);
+      card.style.animationDelay = (idx*0.04)+'s';
+      itemGrid.appendChild(card);
+    });
   }
 
   toggle.querySelectorAll('.group-btn').forEach(btn=>{
@@ -609,10 +628,12 @@ function buildItemCard(item, ctx){
   }
 
   // Botón especificaciones (tortilla / exclusiones / nota)
+  const isDrink = CATEGORIES.find(cat=>cat.id===currentCat).group === 'bebidas';
+
   const specToggle = document.createElement('button');
   specToggle.type = 'button';
   specToggle.className = 'spec-toggle';
-  specToggle.textContent = '🌶️ Especificaciones (sin cebolla, tortilla, notas…)';
+  specToggle.textContent = isDrink ? '📝 Especificaciones (notas)' : '🌶️ Especificaciones (sin cebolla, tortilla, notas…)';
   card.appendChild(specToggle);
 
   const specPanel = document.createElement('div');
@@ -638,31 +659,33 @@ function buildItemCard(item, ctx){
     specPanel.appendChild(twrap);
   }
 
-  const ewrap = document.createElement('div');
-  ewrap.innerHTML = `<div class="field-label">Sin / extra</div>`;
-  const erow = document.createElement('div');
-  erow.className = 'excl-row';
-  EXCLUSIONS.forEach(ex=>{
-    const pill = document.createElement('button');
-    pill.type='button';
-    pill.className = 'excl-pill' + (s.exclusions.includes(ex) ? ' selected' : '');
-    pill.textContent = ex;
-    pill.onclick = ()=>{
-      const idx = s.exclusions.indexOf(ex);
-      if(idx>-1) s.exclusions.splice(idx,1); else s.exclusions.push(ex);
-      pill.classList.toggle('selected');
-    };
-    erow.appendChild(pill);
-  });
-  ewrap.appendChild(erow);
-  specPanel.appendChild(ewrap);
+  if(!isDrink){
+    const ewrap = document.createElement('div');
+    ewrap.innerHTML = `<div class="field-label">Sin / extra</div>`;
+    const erow = document.createElement('div');
+    erow.className = 'excl-row';
+    EXCLUSIONS.forEach(ex=>{
+      const pill = document.createElement('button');
+      pill.type='button';
+      pill.className = 'excl-pill' + (s.exclusions.includes(ex) ? ' selected' : '');
+      pill.textContent = ex;
+      pill.onclick = ()=>{
+        const idx = s.exclusions.indexOf(ex);
+        if(idx>-1) s.exclusions.splice(idx,1); else s.exclusions.push(ex);
+        pill.classList.toggle('selected');
+      };
+      erow.appendChild(pill);
+    });
+    ewrap.appendChild(erow);
+    specPanel.appendChild(ewrap);
+  }
 
   const nwrap = document.createElement('div');
   nwrap.innerHTML = `<div class="field-label">Otra especificación</div>`;
   const noteInput = document.createElement('input');
   noteInput.type = 'text';
   noteInput.className = 'note-input';
-  noteInput.placeholder = 'Ej. bien picoso, sin queso...';
+  noteInput.placeholder = isDrink ? 'Ej. bien fría, sin hielo...' : 'Ej. bien picoso, sin queso...';
   noteInput.value = s.note;
   noteInput.oninput = ()=>{ s.note = noteInput.value; };
   nwrap.appendChild(noteInput);
