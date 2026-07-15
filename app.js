@@ -361,8 +361,7 @@ function renderSalon(root){
   const hero = document.createElement('div');
   hero.className = 'salon-hero';
   hero.innerHTML = `
-    <div class="salon-hero-ring"><img src="icons/icon-192.png" alt="El Guamil"></div>
-    <h2>El Guamil</h2>
+    <h2>🌮 El Guamil</h2>
     <p>Tacos &amp; Papas Rellenas — comandas del día</p>
   `;
   root.appendChild(hero);
