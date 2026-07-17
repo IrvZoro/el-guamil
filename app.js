@@ -16,17 +16,20 @@ const CATEGORIES = [
 
 const ITEMS = {
   tacos:[
-    {id:'t-pastor', name:'Taco de Pastor', price:65, tortillaOption:true},
-    {id:'t-chuleta', name:'Taco de Chuleta', price:70, tortillaOption:true},
-    {id:'t-chorizo', name:'Taco de Chorizo', price:70, tortillaOption:true},
-    {id:'t-suadero', name:'Taco de Suadero', price:70, tortillaOption:true},
-    {id:'t-costilla', name:'Taco de Costilla', price:75, tortillaOption:true},
-    {id:'t-bistec', name:'Taco de Bistec', price:75, tortillaOption:true},
-    {id:'t-campechana', name:'Taco Campechana', price:75, desc:'Combinación de suadero y chorizo.', tortillaOption:true},
-    {id:'t-surtida', name:'Orden Surtida', price:75, tortillaOption:true},
-    {id:'t-tripa', name:'Taco de Tripa', price:75, tortillaOption:true},
+    {id:'t-pastor', name:'Orden de 5 Tacos de Pastor', price:65, tortillaOption:true},
+    {id:'t-chuleta', name:'Orden de 5 Tacos de Chuleta', price:70, tortillaOption:true},
+    {id:'t-chorizo', name:'Orden de 5 Tacos de Chorizo', price:70, tortillaOption:true},
+    {id:'t-suadero', name:'Orden de 5 Tacos de Suadero', price:70, tortillaOption:true},
+    {id:'t-costilla', name:'Orden de 5 Tacos de Costilla', price:75, tortillaOption:true},
+    {id:'t-bistec', name:'Orden de 5 Tacos de Bistec', price:75, tortillaOption:true},
+    {id:'t-campechana', name:'Orden de 5 Tacos Campechana', price:75, desc:'Combinación de suadero y chorizo.', tortillaOption:true},
+    {id:'t-surtida-builder', name:'Arma tu Taco Surtido', price:75, desc:'Elige el sabor de cada uno de tus 5 tacos.', tortillaOption:true,
+      builder:true, builderCount:5, builderOptions:['Pastor','Chuleta','Chorizo','Suadero','Costilla','Bistec','Tripa','Campechana']},
+    {id:'t-tripa', name:'Orden de 5 Tacos de Tripa', price:75, tortillaOption:true},
   ],
   individuales:[
+    {id:'i-maiz-normal', name:'Taco de Maíz Sencillo', price:15,
+      flavors:['Pastor','Chorizo','Suadero','Bistec','Chuleta','Tripa','Costilla','Campechana']},
     {id:'i-maiz', name:'Taco de Maíz con Queso', price:20,
       flavors:['Pastor','Chorizo','Suadero','Bistec','Chuleta','Tripa','Costilla','Campechana']},
     {id:'i-harina-sq', name:'Harina sin Queso', price:25,
@@ -142,10 +145,24 @@ class BTPrinter{
     if(!navigator.bluetooth){
       throw new Error('Este navegador no soporta Web Bluetooth. Usa Chrome en Android.');
     }
-    const device = await navigator.bluetooth.requestDevice({
-      acceptAllDevices:true,
-      optionalServices:[serviceUUID]
-    });
+    let device = null;
+
+    // Intento de reconexión rápida a un dispositivo ya autorizado antes (sin mostrar el selector)
+    if(navigator.bluetooth.getDevices){
+      try{
+        const known = await navigator.bluetooth.getDevices();
+        const savedId = settings[this.role] && settings[this.role].deviceId;
+        if(savedId) device = known.find(d=>d.id===savedId) || null;
+      }catch(e){ /* silencioso: seguimos con el selector normal */ }
+    }
+
+    if(!device){
+      device = await navigator.bluetooth.requestDevice({
+        acceptAllDevices:true,
+        optionalServices:[serviceUUID]
+      });
+    }
+
     const server = await device.gatt.connect();
     const service = await server.getPrimaryService(serviceUUID);
     const characteristic = await service.getCharacteristic(charUUID);
@@ -157,6 +174,7 @@ class BTPrinter{
     this.device = device;
     this.characteristic = characteristic;
     settings[this.role].name = device.name || 'Impresora sin nombre';
+    settings[this.role].deviceId = device.id;
     saveSettings();
   }
 
@@ -167,11 +185,17 @@ class BTPrinter{
 
   async printBytes(bytes){
     if(!this.characteristic) throw new Error('No conectada');
-    const chunkSize = 20;
+    const chunkSize = 100;
+    const fast = !!(this.characteristic.properties && this.characteristic.properties.writeWithoutResponse);
     for(let i=0;i<bytes.length;i+=chunkSize){
-      const chunk = bytes.slice(i,i+chunkSize);
-      await this.characteristic.writeValue(new Uint8Array(chunk));
-      await new Promise(r=>setTimeout(r,25));
+      const chunk = new Uint8Array(bytes.slice(i,i+chunkSize));
+      if(fast){
+        await this.characteristic.writeValueWithoutResponse(chunk);
+        await new Promise(r=>setTimeout(r,4));
+      } else {
+        await this.characteristic.writeValue(chunk);
+        await new Promise(r=>setTimeout(r,12));
+      }
     }
   }
 }
@@ -257,6 +281,7 @@ function cartToTicketItems(cart, onlyNew){
     .map(({c,qty})=>{
       const specs = [];
       if(c.tortilla) specs.push('Tortilla: '+c.tortilla);
+      if(c.builderBreakdown && c.builderBreakdown.length) specs.push(...c.builderBreakdown);
       if(c.exclusions && c.exclusions.length) specs.push(c.exclusions.join(', '));
       if(c.note) specs.push('Nota: '+c.note);
       return { qtyLabel: qty+'x', name:c.label, lineTotal: qty*c.unitPrice, specs };
@@ -469,7 +494,12 @@ function resetItemSelection(){ itemSelection = {}; }
 
 function getSel(item){
   if(!itemSelection[item.id]){
-    itemSelection[item.id] = { flavorIndex:0, variantIndex:0, qty:1, tortilla: item.tortillaOption ? 'Maíz' : null, exclusions:[], note:'', specOpen:false };
+    itemSelection[item.id] = {
+      flavorIndex:0, variantIndex:0, qty:1,
+      tortilla: item.tortillaOption ? 'Maíz' : null,
+      exclusions:[], note:'', specOpen:false,
+      builderFlavors: item.builder ? new Array(item.builderCount).fill(0) : null
+    };
   }
   return itemSelection[item.id];
 }
@@ -626,6 +656,35 @@ function buildItemCard(item, ctx){
     card.appendChild(wrap);
   }
 
+  let builderSelects = null;
+  if(item.builder){
+    const bwrap = document.createElement('div');
+    bwrap.innerHTML = `<div class="field-label">Elige tus ${item.builderCount} tacos</div>`;
+    const bGrid = document.createElement('div');
+    bGrid.className = 'builder-grid';
+    for(let i=0;i<item.builderCount;i++){
+      const row = document.createElement('div');
+      row.className = 'builder-row';
+      const lbl = document.createElement('span');
+      lbl.className = 'builder-num';
+      lbl.textContent = 'Taco ' + (i+1);
+      const sel = document.createElement('select');
+      sel.className = 'spec-select builder-select';
+      item.builderOptions.forEach((f,fi)=>{
+        const opt = document.createElement('option');
+        opt.value = fi; opt.textContent = f;
+        sel.appendChild(opt);
+      });
+      sel.value = s.builderFlavors[i];
+      sel.onchange = ()=>{ s.builderFlavors[i] = parseInt(sel.value); };
+      row.appendChild(lbl); row.appendChild(sel);
+      bGrid.appendChild(row);
+    }
+    bwrap.appendChild(bGrid);
+    card.appendChild(bwrap);
+    builderSelects = bGrid;
+  }
+
   // Botón especificaciones (tortilla / exclusiones / nota)
   const isDrink = CATEGORIES.find(cat=>cat.id===currentCat).group === 'bebidas';
 
@@ -658,10 +717,11 @@ function buildItemCard(item, ctx){
     specPanel.appendChild(twrap);
   }
 
+  let erow = null;
   if(!isDrink){
     const ewrap = document.createElement('div');
     ewrap.innerHTML = `<div class="field-label">Sin / extra</div>`;
-    const erow = document.createElement('div');
+    erow = document.createElement('div');
     erow.className = 'excl-row';
     EXCLUSIONS.forEach(ex=>{
       const pill = document.createElement('button');
@@ -717,7 +777,11 @@ function buildItemCard(item, ctx){
     addToCart(item, ctx.order);
     s.qty = 1; qtySpan.textContent = 1;
     s.note = ''; noteInput.value=''; s.exclusions = [];
-    erow.querySelectorAll('.excl-pill').forEach(p=>p.classList.remove('selected'));
+    if(erow) erow.querySelectorAll('.excl-pill').forEach(p=>p.classList.remove('selected'));
+    if(item.builder && builderSelects){
+      s.builderFlavors = new Array(item.builderCount).fill(0);
+      builderSelects.querySelectorAll('select').forEach(sel=> sel.value = 0);
+    }
     flashCard(item.id);
     updateTicketUI(ctx);
   };
@@ -735,6 +799,12 @@ function flashCard(id){
   card.classList.remove('flash'); void card.offsetWidth; card.classList.add('flash');
 }
 
+function summarizeFlavors(indices, options){
+  const counts = {};
+  indices.forEach(i=>{ const f = options[i]; counts[f] = (counts[f]||0) + 1; });
+  return Object.entries(counts).map(([f,n])=> n+'x '+f);
+}
+
 /* ============ CARRITO (por mesa o para llevar) ============ */
 function addToCart(item, order){
   const s = getSel(item);
@@ -742,7 +812,15 @@ function addToCart(item, order){
   const variant = item.variants ? item.variants[s.variantIndex] : null;
   const unitPrice = variant ? variant.price : item.price;
   const exclusionsKey = [...s.exclusions].sort().join(',');
-  const baseKey = [item.id, flavor||'', variant?variant.label:'', s.tortilla||'', exclusionsKey].join('|');
+
+  let builderBreakdown = null;
+  let builderKeyPart = '';
+  if(item.builder){
+    builderBreakdown = summarizeFlavors(s.builderFlavors, item.builderOptions);
+    builderKeyPart = s.builderFlavors.join(',');
+  }
+
+  const baseKey = [item.id, flavor||'', variant?variant.label:'', s.tortilla||'', exclusionsKey, builderKeyPart].join('|');
   const key = s.note ? baseKey + '|note:' + Date.now() + Math.random() : baseKey;
 
   let label = item.name;
@@ -757,7 +835,8 @@ function addToCart(item, order){
   }
   order.cart.push({
     key, label, unitPrice, qty:s.qty, sentQty:0,
-    tortilla: s.tortilla, exclusions:[...s.exclusions], note: s.note
+    tortilla: s.tortilla, exclusions:[...s.exclusions], note: s.note,
+    builderBreakdown
   });
   if(order.status==='libre') order.status='ocupada';
   if(!order.openedAt) order.openedAt = Date.now();
@@ -829,6 +908,7 @@ function renderDrawerBody(ctx){
       row.className = 'cart-row';
       const tags = [];
       if(c.tortilla) tags.push('Tortilla '+c.tortilla);
+      if(c.builderBreakdown && c.builderBreakdown.length) tags.push(...c.builderBreakdown);
       if(c.exclusions && c.exclusions.length) tags.push(...c.exclusions);
       if(c.note) tags.push('Nota: '+c.note);
       row.innerHTML = `
@@ -1004,7 +1084,7 @@ function buildPrinterCard(role, title, printerObj){
 
   card.querySelector('.btn-connect').onclick = async ()=>{
     try{
-      showToast('Buscando dispositivos Bluetooth…');
+      showToast('🔵 Conectando…');
       await printerObj.connect(serviceInput.value.trim(), charInput.value.trim());
       showToast('✅ Impresora conectada');
       navigate('/config'); renderConfigScreen(document.getElementById('app-root'));
