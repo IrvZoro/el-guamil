@@ -546,18 +546,38 @@ function navigate(hash){ location.hash = hash; }
 window.addEventListener('hashchange', renderApp);
 
 function renderApp(){
-  const ctx = getContextFromHash();
-  const root = document.getElementById('app-root');
-  root.innerHTML = '';
-  document.getElementById('overlay').classList.remove('show');
-  document.getElementById('drawer').classList.remove('show');
-  document.getElementById('ticketFab').classList.remove('show');
+  try{
+    const ctx = getContextFromHash();
+    const root = document.getElementById('app-root');
+    root.innerHTML = '';
+    document.getElementById('overlay').classList.remove('show');
+    document.getElementById('drawer').classList.remove('show');
+    document.getElementById('ticketFab').classList.remove('show');
 
-  if(ctx.type === 'salon') renderSalon(root);
-  else if(ctx.type === 'config') renderConfigScreen(root);
-  else if(ctx.type === 'historial') renderHistorialScreen(root);
-  else if((ctx.type==='mesa' || ctx.type==='takeout') && ctx.order) renderOrderScreen(root, ctx);
-  else { navigate('/salon'); }
+    if(ctx.type === 'salon') renderSalon(root);
+    else if(ctx.type === 'config') renderConfigScreen(root);
+    else if(ctx.type === 'historial') renderHistorialScreen(root);
+    else if((ctx.type==='mesa' || ctx.type==='takeout') && ctx.order) renderOrderScreen(root, ctx);
+    else { navigate('/salon'); }
+  }catch(e){
+    console.error('Error al mostrar la pantalla', e);
+    const root = document.getElementById('app-root');
+    root.innerHTML = `
+      <div style="padding:50px 20px;text-align:center;color:#f7ecd6;">
+        <div style="font-size:2.4rem;margin-bottom:10px;">⚠️</div>
+        <h2 style="color:#e8a33d;margin-bottom:8px;">Ocurrió un error al mostrar esta pantalla</h2>
+        <p style="opacity:.75;font-size:.85rem;margin-bottom:16px;">${(e && e.message) ? String(e.message).replace(/</g,'&lt;') : String(e)}</p>
+        <button onclick="localStorage.clear(); location.hash=''; location.reload();"
+          style="background:linear-gradient(180deg,#f6d488,#e8a33d);color:#241407;border:none;border-radius:10px;padding:12px 20px;font-weight:800;margin-right:8px;">
+          Reiniciar app
+        </button>
+        <button onclick="location.reload();"
+          style="background:rgba(247,236,214,.1);color:#f7ecd6;border:1px solid rgba(247,236,214,.25);border-radius:10px;padding:12px 20px;font-weight:800;">
+          Solo recargar
+        </button>
+      </div>
+    `;
+  }
 }
 
 /* ============ PANTALLA: SALÓN ============ */
@@ -1576,4 +1596,23 @@ function boot(){
     navigator.serviceWorker.register('service-worker.js').catch(()=>{});
   }
 }
+
+window.addEventListener('error', (event)=>{
+  console.error('Error no capturado:', event.error || event.message);
+  const root = document.getElementById('app-root');
+  if(root && root.innerHTML.trim()==='') {
+    root.innerHTML = `
+      <div style="padding:50px 20px;text-align:center;color:#f7ecd6;">
+        <div style="font-size:2.4rem;margin-bottom:10px;">⚠️</div>
+        <h2 style="color:#e8a33d;margin-bottom:8px;">Ocurrió un error al iniciar la app</h2>
+        <p style="opacity:.75;font-size:.85rem;margin-bottom:16px;">${String(event.message||'').replace(/</g,'&lt;')}</p>
+        <button onclick="localStorage.clear(); location.hash=''; location.reload();"
+          style="background:linear-gradient(180deg,#f6d488,#e8a33d);color:#241407;border:none;border-radius:10px;padding:12px 20px;font-weight:800;">
+          Reiniciar app
+        </button>
+      </div>
+    `;
+  }
+});
+
 boot();
