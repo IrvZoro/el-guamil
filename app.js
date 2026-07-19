@@ -17,6 +17,7 @@ const CATEGORIES = [
 const ITEMS = {
   tacos:[
     {id:'t-pastor', name:'Orden de 5 Tacos de Pastor', price:65, tortillaOption:true},
+    {id:'t-pblanco', name:'Orden de 5 Tacos Pastor Blanco', price:75, tortillaOption:true},
     {id:'t-chuleta', name:'Orden de 5 Tacos de Chuleta', price:70, tortillaOption:true},
     {id:'t-chorizo', name:'Orden de 5 Tacos de Chorizo', price:70, tortillaOption:true},
     {id:'t-suadero', name:'Orden de 5 Tacos de Suadero', price:70, tortillaOption:true},
@@ -36,15 +37,16 @@ const ITEMS = {
       flavors:['Pastor','Chorizo','Suadero','Bistec','Chuleta','Tripa','Costilla','Campechana']},
     {id:'i-harina-cq', name:'Harina con Queso', price:30,
       flavors:['Pastor','Chorizo','Suadero','Bistec','Chuleta','Tripa','Costilla','Campechana']},
+    {id:'i-harina-pb', name:'Harina c/Queso Pastor Blanco', price:30},
   ],
   papas:[
-    {id:'p-guera', name:"Papa Güera ⭐", price:150, desc:'Pastor blanco y delicioso queso fundido.'},
-    {id:'p-natural', name:'Papa Natural', price:100, desc:'Mantequilla, crema y queso.'},
-    {id:'p-especial', name:'Papa Especial', price:150, desc:'Pastor, chuleta, bistec y queso.'},
-    {id:'p-llene', name:"Papa Pa' Que Me Llene", price:145, desc:'Pastor, chuleta, morrón, cebolla, piña, jitomate y queso.'},
-    {id:'p-vegetariana', name:'Papa Vegetariana', price:140, desc:'Champiñón, morrón, cebolla, nopales, ensalada, piña y queso.'},
-    {id:'p-chingona', name:'Papa Chingona', price:150, desc:'Costilla, bistec y queso.'},
-    {id:'p-loca', name:'Papa Loca', price:145, desc:'Pastor, piña, jamón y queso.'},
+    {id:'p-guera', name:"Papa Güera ⭐", price:150, desc:'Pastor blanco y delicioso queso fundido.', tortillaOption:true},
+    {id:'p-natural', name:'Papa Natural', price:100, desc:'Mantequilla, crema y queso.', tortillaOption:true},
+    {id:'p-especial', name:'Papa Especial', price:150, desc:'Pastor, chuleta, bistec y queso.', tortillaOption:true},
+    {id:'p-llene', name:"Papa Pa' Que Me Llene", price:145, desc:'Pastor, chuleta, morrón, cebolla, piña, jitomate y queso.', tortillaOption:true},
+    {id:'p-vegetariana', name:'Papa Vegetariana', price:140, desc:'Champiñón, morrón, cebolla, nopales, ensalada, piña y queso.', tortillaOption:true},
+    {id:'p-chingona', name:'Papa Chingona', price:150, desc:'Costilla, bistec y queso.', tortillaOption:true},
+    {id:'p-loca', name:'Papa Loca', price:145, desc:'Pastor, piña, jamón y queso.', tortillaOption:true},
   ],
   especialidades:[
     {id:'e-vez', name:'Que Me Vez', desc:'Pastor, chuleta y queso.', variants:[{label:'Medio platillo',price:100},{label:'Platillo completo',price:130}]},
@@ -56,8 +58,6 @@ const ITEMS = {
     {id:'e-alambre', name:'Alambre', desc:'Chuleta, chile morrón, cebolla y queso.', variants:[{label:'Medio platillo',price:100},{label:'Platillo completo',price:130}]},
   ],
   gringas:[
-    {id:'g-pblanco', name:'Orden Pastor Blanco (5 tzs)', price:75, tortillaOption:true},
-    {id:'g-harina-pb', name:'1 Pz Harina c/Queso Pastor Blanco', price:30},
     {id:'g-clasica', name:'Gringa Clásica (Pastor)', price:80},
     {id:'g-especial', name:'Gringa Especial', price:85, flavors:['Chuleta','Bistec','Costilla']},
     {id:'g-queso', name:'Queso Fundido Especial', price:95, flavors:['Natural','Champiñón','Chorizo','Bistec']},
@@ -74,6 +74,9 @@ const ITEMS = {
     {id:'c-queso', name:'Queso Extra (1 Kg)', price:100},
     {id:'c-rabano', name:'Rábano / Limón / Piña extra', price:10},
     {id:'c-salsa', name:'Salsa / Ensalada extra', price:5},
+    {id:'c-tort-maiz-kg', name:'Tortillas de Maíz por Kilo', variants:[{label:'1/2 Kg',price:20},{label:'1 Kg',price:35}]},
+    {id:'c-tort-harina-kg', name:'Tortillas de Harina por Kilo', variants:[{label:'1/2 Kg',price:25},{label:'1 Kg',price:45}]},
+    {id:'c-tort-pieza', name:'Tortilla Individual', price:2, flavors:['Maíz','Harina']},
   ],
   bebidas:[
     {id:'b-refresco', name:'Refresco de Vidrio', price:35},
@@ -91,22 +94,34 @@ const STORAGE_KEY = 'guamil_pos_state_v1';
 const SETTINGS_KEY = 'guamil_pos_settings_v1';
 
 function freshOrder(){
-  return { cart:[], noteGeneral:'', openedAt:null, status:'libre' };
+  return { cart:[], noteGeneral:'', openedAt:null, status:'libre', cancellations:[] };
 }
 
 function loadState(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
-    if(raw) return JSON.parse(raw);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      // Migración: asegurar que existan los campos nuevos aunque el estado sea de una versión anterior
+      if(!parsed.salesLog) parsed.salesLog = [];
+      if(!parsed.cancellationsLog) parsed.cancellationsLog = [];
+      if(!parsed.takeout) parsed.takeout = [];
+      if(!parsed.nextTakeoutId) parsed.nextTakeoutId = 1;
+      return parsed;
+    }
   }catch(e){ console.warn('No se pudo cargar estado guardado', e); }
   const tables = {};
   for(let i=1;i<=NUM_TABLES;i++) tables[i] = freshOrder();
-  return { tables, takeout: [], nextTakeoutId: 1 };
+  return { tables, takeout: [], nextTakeoutId: 1, salesLog: [], cancellationsLog: [] };
 }
 
 function saveState(){
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
   catch(e){ console.warn('No se pudo guardar estado', e); }
+  if(FIREBASE_ENABLED && fbReady){
+    clearTimeout(fbSyncTimer);
+    fbSyncTimer = setTimeout(pushStateToFirebase, 350);
+  }
 }
 
 function loadSettings(){
@@ -125,6 +140,82 @@ function saveSettings(){
 
 let state = loadState();
 let settings = loadSettings();
+
+/* ============ SINCRONIZACIÓN EN TIEMPO REAL (OPCIONAL, VÍA FIREBASE) ============
+   Si no se configura firebase-config.js, la app funciona 100% local en este
+   celular, exactamente como antes. Si se configura, las mesas y pedidos para
+   llevar se sincronizan en vivo entre todos los celulares conectados, y los
+   tickets se mandan a una fila compartida para que se impriman uno tras otro. */
+const FIREBASE_ENABLED = (typeof FIREBASE_CONFIG !== 'undefined')
+  && FIREBASE_CONFIG.apiKey
+  && FIREBASE_CONFIG.apiKey !== 'TU_API_KEY';
+
+let fbDb = null;
+let fbReady = false;
+let fbSyncTimer = null;
+
+function initFirebaseSync(){
+  if(!FIREBASE_ENABLED) return;
+  try{
+    firebase.initializeApp(FIREBASE_CONFIG);
+    fbDb = firebase.database();
+    firebase.auth().signInAnonymously().then(()=>{
+      fbReady = true;
+      attachRealtimeListeners();
+      showToast('🟢 Sincronización con otros celulares activa');
+    }).catch(e=>{
+      console.warn('Firebase auth error', e);
+      showToast('⚠️ No se pudo sincronizar (revisa tu conexión a internet)');
+    });
+  }catch(e){ console.warn('Firebase init error', e); }
+}
+
+function attachRealtimeListeners(){
+  fbDb.ref('posState/tables').on('value', snap=>{
+    const val = snap.val() || {};
+    for(let i=1;i<=NUM_TABLES;i++){
+      const remote = val[i];
+      if(remote){
+        if(!state.tables[i]) state.tables[i] = freshOrder();
+        Object.keys(state.tables[i]).forEach(k=> delete state.tables[i][k]);
+        Object.assign(state.tables[i], remote);
+      }
+    }
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+    refreshCurrentScreenSoft();
+  });
+
+  fbDb.ref('posState/takeout').on('value', snap=>{
+    const val = snap.val() || {};
+    Object.values(val).forEach(remote=>{
+      let local = state.takeout.find(t=>t.id===remote.id);
+      if(!local){ local = {}; state.takeout.push(local); }
+      Object.keys(local).forEach(k=> delete local[k]);
+      Object.assign(local, remote);
+    });
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+    refreshCurrentScreenSoft();
+  });
+}
+
+function refreshCurrentScreenSoft(){
+  const ctx = getContextFromHash();
+  if(ctx.type==='salon'){
+    renderApp();
+  } else if((ctx.type==='mesa' || ctx.type==='takeout') && ctx.order){
+    updateTicketUI(ctx);
+  }
+}
+
+function pushStateToFirebase(){
+  if(!fbDb) return;
+  for(let i=1;i<=NUM_TABLES;i++){
+    fbDb.ref('posState/tables/'+i).set(state.tables[i]).catch(e=>console.warn('Sync mesa falló', e));
+  }
+  state.takeout.forEach(t=>{
+    fbDb.ref('posState/takeout/'+t.id).set(t).catch(e=>console.warn('Sync para llevar falló', e));
+  });
+}
 
 /* ============ IMPRESIÓN — BLUETOOTH ESC/POS + RESPALDO EN NAVEGADOR ============ */
 const PRINTER_PRESETS = [
@@ -312,6 +403,21 @@ function bytesLinesForPreview({title, subtitle, items, showPrices, total, note, 
 }
 
 async function sendTicket(role, payload){
+  if(FIREBASE_ENABLED && fbReady && fbDb){
+    try{
+      await fbDb.ref('posState/printQueue/'+role).push({
+        payload, createdAt: Date.now(), createdBy: staffLabel(), claimed:false
+      });
+      showToast('📨 Ticket enviado a la fila de ' + (role==='kitchen'?'cocina':'caja'));
+      return true;
+    }catch(e){
+      console.warn('No se pudo encolar el ticket, imprimiendo local', e);
+    }
+  }
+  return printDirectly(role, payload);
+}
+
+async function printDirectly(role, payload){
   const printer = role==='kitchen' ? kitchenPrinter : cashierPrinter;
   const bytes = buildTicketBytes(payload);
   if(printer.isConnected()){
@@ -328,6 +434,60 @@ async function sendTicket(role, payload){
   return false;
 }
 
+/* ============ COLA DE IMPRESIÓN COMPARTIDA (uno tras otro, entre celulares) ============ */
+const queueListeners = { kitchen:null, cashier:null };
+const queueProcessing = { kitchen:false, cashier:false };
+const pendingJobs = { kitchen:[], cashier:[] };
+
+function startQueueConsumer(role){
+  if(!FIREBASE_ENABLED || !fbReady || !fbDb) return;
+  if(queueListeners[role]) return; // ya está escuchando en este celular
+  const ref = fbDb.ref('posState/printQueue/'+role).orderByKey();
+  ref.on('child_added', snap=>{
+    pendingJobs[role].push({ key: snap.key });
+    drainQueue(role);
+  });
+  queueListeners[role] = ref;
+}
+
+function stopQueueConsumer(role){
+  if(queueListeners[role]){
+    queueListeners[role].off('child_added');
+    queueListeners[role] = null;
+  }
+}
+
+async function drainQueue(role){
+  if(queueProcessing[role]) return;
+  queueProcessing[role] = true;
+  while(pendingJobs[role].length){
+    const job = pendingJobs[role].shift();
+    const jobRef = fbDb.ref('posState/printQueue/'+role+'/'+job.key);
+    try{
+      // Transacción: solo un celular "gana" el derecho a imprimir este ticket,
+      // así evitamos que se imprima dos veces si dos aparatos están conectados
+      // a la misma impresora al mismo tiempo.
+      const result = await jobRef.transaction(current=>{
+        if(current===null) return current;
+        if(current.claimed) return; // otro celular ya lo reclamó: abortar
+        current.claimed = true;
+        current.claimedBy = staffLabel();
+        return current;
+      });
+      if(result.committed && result.snapshot && result.snapshot.exists()){
+        const data = result.snapshot.val();
+        if(data.claimedBy === staffLabel()){
+          await printDirectly(role, data.payload);
+          await jobRef.remove();
+        }
+      }
+    }catch(e){
+      console.warn('Error procesando la fila de impresión', e);
+    }
+  }
+  queueProcessing[role] = false;
+}
+
 function escapeHtml(s){
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
@@ -335,6 +495,26 @@ function escapeHtml(s){
 /* ============ UTILIDADES DE PEDIDO ============ */
 function computeCartTotal(cart){ return cart.reduce((a,c)=>a + c.qty*c.unitPrice, 0); }
 function computeCartCount(cart){ return cart.reduce((a,c)=>a + c.qty, 0); }
+
+function logSale(ctx, order){
+  const total = computeCartTotal(order.cart);
+  if(total<=0) return;
+  if(!state.salesLog) state.salesLog = [];
+  state.salesLog.push({
+    type: ctx.type,
+    label: orderTitle(ctx),
+    total,
+    itemCount: computeCartCount(order.cart),
+    items: order.cart.map(c=>({ label:c.label, qty:c.qty, unitPrice:c.unitPrice })),
+    closedAt: Date.now()
+  });
+}
+
+function isSameLocalDay(ts1, ts2){
+  const d1 = new Date(ts1), d2 = new Date(ts2);
+  return d1.getFullYear()===d2.getFullYear() && d1.getMonth()===d2.getMonth() && d1.getDate()===d2.getDate();
+}
+
 function computePendingKitchenCount(cart){
   return cart.reduce((a,c)=> a + Math.max(0, c.qty - (c.sentQty||0)), 0);
 }
@@ -351,6 +531,7 @@ function getContextFromHash(){
     return { type:'takeout', id, order: state.takeout.find(t=>t.id===id) };
   }
   if(parts[0] === 'config') return { type:'config' };
+  if(parts[0] === 'historial') return { type:'historial' };
   return { type:'salon' };
 }
 
@@ -374,6 +555,7 @@ function renderApp(){
 
   if(ctx.type === 'salon') renderSalon(root);
   else if(ctx.type === 'config') renderConfigScreen(root);
+  else if(ctx.type === 'historial') renderHistorialScreen(root);
   else if((ctx.type==='mesa' || ctx.type==='takeout') && ctx.order) renderOrderScreen(root, ctx);
   else { navigate('/salon'); }
 }
@@ -422,8 +604,8 @@ function renderSalon(root){
   `;
   c.appendChild(banner);
   banner.querySelector('#newTakeoutBtn').onclick = ()=>{
-    const id = state.nextTakeoutId++;
-    state.takeout.push({ id, customerName:'', phone:'', cart:[], noteGeneral:'', status:'abierta', createdAt:Date.now() });
+    const id = FIREBASE_ENABLED ? Date.now() : state.nextTakeoutId++;
+    state.takeout.push({ id, customerName:'', phone:'', cart:[], noteGeneral:'', status:'abierta', createdAt:Date.now(), cancellations:[] });
     saveState();
     navigate('/parallevar/'+id);
   };
@@ -471,10 +653,11 @@ function buildTopbar({title, sub, showBack, showConfig}){
       <h1 style="margin:0;">${title}</h1>
       ${sub ? `<div class="sub">${sub}</div>` : ''}
     </div>
-    ${showConfig ? '<button class="icon-btn" id="cfgBtn" title="Impresoras">🖨️</button>' : ''}
+    ${showConfig ? '<button class="icon-btn" id="histBtn" title="Historial de ventas">📊</button><button class="icon-btn" id="cfgBtn" title="Impresoras">🖨️</button>' : ''}
   `;
   if(showBack) bar.querySelector('#backBtn').onclick = ()=> navigate('/salon');
   if(showConfig) bar.querySelector('#cfgBtn').onclick = ()=> navigate('/config');
+  if(showConfig) bar.querySelector('#histBtn').onclick = ()=> navigate('/historial');
   return bar;
 }
 
@@ -687,11 +870,13 @@ function buildItemCard(item, ctx){
 
   // Botón especificaciones (tortilla / exclusiones / nota)
   const isDrink = CATEGORIES.find(cat=>cat.id===currentCat).group === 'bebidas';
+  const NO_EXCLUSION_CHIPS_CATS = ['bebidas','gringas','papas'];
+  const showExclusionChips = !NO_EXCLUSION_CHIPS_CATS.includes(currentCat);
 
   const specToggle = document.createElement('button');
   specToggle.type = 'button';
   specToggle.className = 'spec-toggle';
-  specToggle.textContent = isDrink ? '📝 Especificaciones (notas)' : '🌶️ Especificaciones (sin cebolla, tortilla, notas…)';
+  specToggle.textContent = showExclusionChips ? '🌶️ Especificaciones (sin cebolla, tortilla, notas…)' : '📝 Especificaciones (tortilla, notas por escrito)';
   card.appendChild(specToggle);
 
   const specPanel = document.createElement('div');
@@ -718,7 +903,7 @@ function buildItemCard(item, ctx){
   }
 
   let erow = null;
-  if(!isDrink){
+  if(showExclusionChips){
     const ewrap = document.createElement('div');
     ewrap.innerHTML = `<div class="field-label">Sin / extra</div>`;
     erow = document.createElement('div');
@@ -857,6 +1042,72 @@ function removeItem(order, key){
   saveState();
 }
 
+function itemSpecsFor(c){
+  const specs = [];
+  if(c.tortilla) specs.push('Tortilla: '+c.tortilla);
+  if(c.builderBreakdown && c.builderBreakdown.length) specs.push(...c.builderBreakdown);
+  if(c.exclusions && c.exclusions.length) specs.push(c.exclusions.join(', '));
+  if(c.note) specs.push('Nota: '+c.note);
+  return specs;
+}
+
+function resendItemToKitchen(ctx, key){
+  const order = ctx.order;
+  const c = order.cart.find(x=>x.key===key);
+  if(!c) return;
+  sendTicket('kitchen', {
+    title: orderTitle(ctx).toUpperCase(),
+    subtitle: '🔁 REENVÍO A COCINA',
+    items:[{ qtyLabel: c.qty+'x', name:c.label, lineTotal:0, specs: itemSpecsFor(c) }],
+    showPrices:false
+  });
+  showToast('🔁 Producto reenviado a cocina');
+}
+
+function requestCancelItem(ctx, key){
+  const order = ctx.order;
+  const c = order.cart.find(x=>x.key===key);
+  if(!c) return;
+  const maxQty = c.qty;
+  let qtyToCancel = maxQty;
+  if(maxQty > 1){
+    const qtyStr = prompt(`¿Cuántas piezas de "${c.label}" quieres cancelar? (máximo ${maxQty})`, String(maxQty));
+    if(qtyStr===null) return;
+    qtyToCancel = parseInt(qtyStr);
+    if(isNaN(qtyToCancel) || qtyToCancel<=0) return;
+    if(qtyToCancel>maxQty) qtyToCancel = maxQty;
+  } else {
+    if(!confirm(`¿Cancelar "${c.label}"? Ya fue enviado a cocina.`)) return;
+  }
+  const reason = prompt('Motivo de la cancelación (obligatorio):', '');
+  if(!reason || !reason.trim()){ showToast('⚠️ Cancelación no realizada: falta el motivo'); return; }
+  const trimmedReason = reason.trim();
+
+  const record = {
+    itemLabel: c.label, qty: qtyToCancel, reason: trimmedReason,
+    at: Date.now(), orderLabel: orderTitle(ctx)
+  };
+  if(!order.cancellations) order.cancellations = [];
+  order.cancellations.push(record);
+  if(!state.cancellationsLog) state.cancellationsLog = [];
+  state.cancellationsLog.push(record);
+
+  c.qty -= qtyToCancel;
+  c.sentQty = Math.max(0, (c.sentQty||0) - qtyToCancel);
+  if(c.qty<=0) order.cart = order.cart.filter(x=>x.key!==key);
+
+  saveState();
+
+  sendTicket('kitchen', {
+    title: orderTitle(ctx).toUpperCase(),
+    subtitle: '❌ CANCELACIÓN',
+    items:[{ qtyLabel: qtyToCancel+'x', name:c.label, lineTotal:0, specs:['Motivo: '+trimmedReason] }],
+    showPrices:false
+  });
+
+  showToast('❌ Cancelación registrada y enviada a cocina');
+}
+
 /* ============ TICKET FLOTANTE / DRAWER ============ */
 function setupTicketUI(ctx){
   const fab = document.getElementById('ticketFab');
@@ -904,6 +1155,7 @@ function renderDrawerBody(ctx){
   } else {
     order.cart.forEach(c=>{
       const isNew = c.qty > (c.sentQty||0);
+      const wasSent = (c.sentQty||0) > 0;
       const row = document.createElement('div');
       row.className = 'cart-row';
       const tags = [];
@@ -923,10 +1175,19 @@ function renderDrawerBody(ctx){
           </div>
           <button class="cart-remove" data-act="remove">Quitar</button>
         </div>
+        ${wasSent ? `
+        <div class="cart-row-kitchen-actions">
+          <button class="cart-resend" data-act="resend">🔁 Reenviar a cocina</button>
+          <button class="cart-cancel" data-act="cancel">❌ Cancelar (con motivo)</button>
+        </div>` : ''}
       `;
       row.querySelector('[data-act=minus]').onclick = ()=>{ changeQty(order,c.key,-1); updateTicketUI(ctx); };
       row.querySelector('[data-act=plus]').onclick = ()=>{ changeQty(order,c.key,1); updateTicketUI(ctx); };
       row.querySelector('[data-act=remove]').onclick = ()=>{ removeItem(order,c.key); updateTicketUI(ctx); };
+      const resendBtn = row.querySelector('[data-act=resend]');
+      if(resendBtn) resendBtn.onclick = ()=> resendItemToKitchen(ctx, c.key);
+      const cancelBtn = row.querySelector('[data-act=cancel]');
+      if(cancelBtn) cancelBtn.onclick = ()=>{ requestCancelItem(ctx, c.key); updateTicketUI(ctx); };
       body.appendChild(row);
     });
   }
@@ -973,6 +1234,7 @@ function renderDrawerBody(ctx){
   closeBtn.disabled = order.cart.length===0;
   closeBtn.onclick = ()=>{
     if(!confirm(ctx.type==='mesa' ? '¿Liberar la mesa y limpiar su cuenta?' : '¿Marcar este pedido como entregado?')) return;
+    logSale(ctx, order);
     if(ctx.type==='mesa'){
       state.tables[ctx.id] = freshOrder();
     } else {
@@ -1007,12 +1269,137 @@ function showToast(msg){
 }
 
 /* ============ PANTALLA: CONFIGURACIÓN / IMPRESORAS ============ */
+/* ============ PANTALLA: HISTORIAL DE VENTAS ============ */
+function renderHistorialScreen(root){
+  const topbar = buildTopbar({ title:'Historial de ventas', sub:'Ventas del día · cierre de caja', showBack:true, showConfig:false });
+  root.appendChild(topbar);
+
+  const c = document.createElement('div');
+  c.className = 'container';
+
+  const salesLog = state.salesLog || [];
+  const cancellationsLog = state.cancellationsLog || [];
+  const now = Date.now();
+  const todaySales = salesLog.filter(s=> isSameLocalDay(s.closedAt, now));
+  const todayCancellations = cancellationsLog.filter(s=> isSameLocalDay(s.at, now));
+
+  const totalToday = todaySales.reduce((a,s)=>a+s.total,0);
+  const mesaSales = todaySales.filter(s=>s.type==='mesa');
+  const takeoutSales = todaySales.filter(s=>s.type==='takeout');
+
+  const summary = document.createElement('div');
+  summary.className = 'sales-summary';
+  summary.innerHTML = `
+    <div class="sales-summary-main">
+      <span class="label">Total vendido hoy</span>
+      <span class="amount">$${totalToday}</span>
+    </div>
+    <div class="sales-summary-grid">
+      <div><span class="num">${todaySales.length}</span><span class="lbl">Cuentas cerradas</span></div>
+      <div><span class="num">${mesaSales.length}</span><span class="lbl">Mesas</span></div>
+      <div><span class="num">${takeoutSales.length}</span><span class="lbl">Para llevar</span></div>
+      <div><span class="num">${todayCancellations.length}</span><span class="lbl">Cancelaciones</span></div>
+    </div>
+  `;
+  c.appendChild(summary);
+
+  const lbl1 = document.createElement('div');
+  lbl1.className = 'section-label';
+  lbl1.textContent = 'Cuentas cerradas hoy';
+  c.appendChild(lbl1);
+
+  if(todaySales.length===0){
+    const empty = document.createElement('div');
+    empty.className = 'empty-cart';
+    empty.innerHTML = '<div class="emoji">📊</div>Todavía no se ha cerrado ninguna cuenta hoy.';
+    c.appendChild(empty);
+  } else {
+    const list = document.createElement('div');
+    list.className = 'takeout-list';
+    [...todaySales].reverse().forEach(s=>{
+      const row = document.createElement('div');
+      row.className = 'takeout-row';
+      const time = new Date(s.closedAt).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+      row.innerHTML = `
+        <div class="info">
+          <b>${s.type==='mesa' ? '🪑 ' : '🥡 '}${escapeHtml(s.label)}</b>
+          <div>${time} · ${s.itemCount} productos</div>
+        </div>
+        <div style="text-align:right;">
+          <div class="amount">$${s.total}</div>
+        </div>
+      `;
+      list.appendChild(row);
+    });
+    c.appendChild(list);
+  }
+
+  if(todayCancellations.length>0){
+    const lbl2 = document.createElement('div');
+    lbl2.className = 'section-label';
+    lbl2.textContent = 'Cancelaciones de hoy';
+    c.appendChild(lbl2);
+
+    const cList = document.createElement('div');
+    cList.className = 'takeout-list';
+    [...todayCancellations].reverse().forEach(r=>{
+      const row = document.createElement('div');
+      row.className = 'takeout-row cancel-row';
+      const time = new Date(r.at).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+      row.innerHTML = `
+        <div class="info">
+          <b>❌ ${r.qty}x ${escapeHtml(r.itemLabel)}</b>
+          <div>${escapeHtml(r.orderLabel)} · ${time}</div>
+          <div class="cancel-reason">Motivo: ${escapeHtml(r.reason)}</div>
+        </div>
+      `;
+      cList.appendChild(row);
+    });
+    c.appendChild(cList);
+  }
+
+  const closeDayWrap = document.createElement('div');
+  closeDayWrap.className = 'close-day-wrap';
+  closeDayWrap.innerHTML = `<button class="btn-sm danger" id="closeDayBtn">🗑️ Cerrar día y borrar historial</button>
+    <p class="hint">Esto borra el historial de ventas y cancelaciones guardado en este celular. Úsalo solo al final del día, después de anotar tu corte de caja.</p>`;
+  c.appendChild(closeDayWrap);
+  closeDayWrap.querySelector('#closeDayBtn').onclick = ()=>{
+    if(!confirm('¿Seguro que quieres borrar el historial de ventas y cancelaciones? Esta acción no se puede deshacer.')) return;
+    state.salesLog = [];
+    state.cancellationsLog = [];
+    saveState();
+    renderApp();
+  };
+
+  root.appendChild(c);
+  root.appendChild(buildFooter());
+}
+
 function renderConfigScreen(root){
   const topbar = buildTopbar({ title:'Impresoras Bluetooth', sub:'Cocina y caja', showBack:true, showConfig:false });
   root.appendChild(topbar);
 
   const c = document.createElement('div');
   c.className = 'container';
+
+  const staff = getLoggedStaff();
+  const sessionCard = document.createElement('div');
+  sessionCard.className = 'printer-card';
+  sessionCard.innerHTML = `
+    <h3>👤 Sesión</h3>
+    <div class="status connected">Conectado como: ${staff ? escapeHtml(staff.name) : 'Desconocido'}</div>
+    <div class="status ${FIREBASE_ENABLED ? (fbReady?'connected':'disconnected') : 'disconnected'}">
+      ${FIREBASE_ENABLED ? (fbReady ? '🟢 Sincronización con otros celulares: activa' : '🟡 Conectando a la sincronización…') : '⚪ Sincronización entre celulares: no configurada'}
+    </div>
+    <div class="btn-row">
+      <button class="btn-sm danger" id="logoutBtn">🚪 Cerrar sesión</button>
+    </div>
+    ${!FIREBASE_ENABLED ? '<p class="hint">Para que varios celulares vean las mismas mesas ocupadas en vivo y compartan la fila de impresión, pide a Claude que te guíe para configurar firebase-config.js (gratis, ~10 minutos).</p>' : ''}
+  `;
+  sessionCard.querySelector('#logoutBtn').onclick = ()=>{
+    if(confirm('¿Cerrar sesión de '+(staff?staff.name:'')+'?')) logoutStaff();
+  };
+  c.appendChild(sessionCard);
 
   const warn = document.createElement('div');
   warn.className = 'warn-box';
@@ -1087,6 +1474,7 @@ function buildPrinterCard(role, title, printerObj){
       showToast('🔵 Conectando…');
       await printerObj.connect(serviceInput.value.trim(), charInput.value.trim());
       showToast('✅ Impresora conectada');
+      startQueueConsumer(role);
       navigate('/config'); renderConfigScreen(document.getElementById('app-root'));
     }catch(e){
       console.error(e);
@@ -1106,6 +1494,7 @@ function buildPrinterCard(role, title, printerObj){
   const discBtn = card.querySelector('.btn-disconnect');
   if(discBtn) discBtn.onclick = ()=>{
     printerObj.disconnect();
+    stopQueueConsumer(role);
     showToast('Impresora desconectada');
     renderConfigScreen(document.getElementById('app-root'));
   };
@@ -1113,10 +1502,76 @@ function buildPrinterCard(role, title, printerObj){
   return card;
 }
 
+/* ============ ACCESO — SOLO 3 PERSONAS DE PERSONAL ============ */
+/* Cambia aquí los nombres y PINs de las 3 personas que pueden usar la app.
+   Esto es un candado a nivel de la app (no de la base de datos), pensado
+   para un negocio pequeño: cualquiera que sepa un PIN puede entrar desde
+   cualquier celular. No lo compartas fuera de tu personal de confianza. */
+const STAFF = [
+  { id:'m1',   name:'Mesero 1',      pin:'1111' },
+  { id:'m2',   name:'Mesero 2',      pin:'2222' },
+  { id:'caja', name:'Caja / Cocina', pin:'3333' },
+];
+const STAFF_KEY = 'guamil_pos_staff_v1';
+
+function getLoggedStaff(){
+  try{ return JSON.parse(localStorage.getItem(STAFF_KEY)); }catch(e){ return null; }
+}
+function setLoggedStaff(staff){
+  try{ localStorage.setItem(STAFF_KEY, JSON.stringify(staff)); }catch(e){}
+}
+function logoutStaff(){
+  try{ localStorage.removeItem(STAFF_KEY); }catch(e){}
+  location.hash = '';
+  location.reload();
+}
+function staffLabel(){
+  const s = getLoggedStaff();
+  return s ? s.name : 'Desconocido';
+}
+
+function renderLoginScreen(){
+  const root = document.getElementById('app-root');
+  root.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.className = 'login-screen';
+  wrap.innerHTML = `
+    <div class="login-card">
+      <img class="login-logo" src="icons/icon-192.png" alt="El Guamil">
+      <h2>El Guamil</h2>
+      <p>Ingresa tu PIN de personal para continuar</p>
+      <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" id="pinInput" class="login-pin-input" placeholder="••••">
+      <button id="pinSubmit" class="btn-sm primary login-submit">Entrar</button>
+      <div id="loginError" class="login-error"></div>
+    </div>
+  `;
+  root.appendChild(wrap);
+  const input = wrap.querySelector('#pinInput');
+  const err = wrap.querySelector('#loginError');
+  input.focus();
+  const submit = ()=>{
+    const val = input.value.trim();
+    const staff = STAFF.find(s=>s.pin===val);
+    if(staff){
+      setLoggedStaff(staff);
+      boot();
+    } else {
+      err.textContent = 'PIN incorrecto, intenta de nuevo';
+      input.value=''; input.focus();
+    }
+  };
+  wrap.querySelector('#pinSubmit').onclick = submit;
+  input.addEventListener('keydown', e=>{ if(e.key==='Enter') submit(); });
+}
+
 /* ============ INICIO ============ */
 function boot(){
+  const staff = getLoggedStaff();
+  if(!staff){ renderLoginScreen(); return; }
+
   if(!location.hash) location.hash = '#/salon';
   renderApp();
+  initFirebaseSync();
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('service-worker.js').catch(()=>{});
   }
