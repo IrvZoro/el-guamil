@@ -177,8 +177,10 @@ function attachRealtimeListeners(){
       const remote = val[i];
       if(remote){
         if(!state.tables[i]) state.tables[i] = freshOrder();
+        // Firebase omite arreglos/objetos vacíos al guardarlos (ej. cart:[] no se guarda),
+        // así que primero rellenamos con los valores por defecto y luego aplicamos lo remoto encima.
         Object.keys(state.tables[i]).forEach(k=> delete state.tables[i][k]);
-        Object.assign(state.tables[i], remote);
+        Object.assign(state.tables[i], freshOrder(), remote);
       }
     }
     try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
@@ -190,8 +192,9 @@ function attachRealtimeListeners(){
     Object.values(val).forEach(remote=>{
       let local = state.takeout.find(t=>t.id===remote.id);
       if(!local){ local = {}; state.takeout.push(local); }
+      const base = { id: remote.id, customerName:'', phone:'', cart:[], noteGeneral:'', status:'abierta', createdAt:Date.now(), cancellations:[] };
       Object.keys(local).forEach(k=> delete local[k]);
-      Object.assign(local, remote);
+      Object.assign(local, base, remote);
     });
     try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
     refreshCurrentScreenSoft();
@@ -493,8 +496,8 @@ function escapeHtml(s){
 }
 
 /* ============ UTILIDADES DE PEDIDO ============ */
-function computeCartTotal(cart){ return cart.reduce((a,c)=>a + c.qty*c.unitPrice, 0); }
-function computeCartCount(cart){ return cart.reduce((a,c)=>a + c.qty, 0); }
+function computeCartTotal(cart){ return (cart||[]).reduce((a,c)=>a + c.qty*c.unitPrice, 0); }
+function computeCartCount(cart){ return (cart||[]).reduce((a,c)=>a + c.qty, 0); }
 
 function logSale(ctx, order){
   const total = computeCartTotal(order.cart);
@@ -516,7 +519,7 @@ function isSameLocalDay(ts1, ts2){
 }
 
 function computePendingKitchenCount(cart){
-  return cart.reduce((a,c)=> a + Math.max(0, c.qty - (c.sentQty||0)), 0);
+  return (cart||[]).reduce((a,c)=> a + Math.max(0, c.qty - (c.sentQty||0)), 0);
 }
 
 function getContextFromHash(){
